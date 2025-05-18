@@ -1,0 +1,1696 @@
+Speech and Language Processing.
+Daniel Jurafsky & James H. Martin.
+Copyright © 2024.
+All
+rights reserved.
+Draft of August 20, 2024.
+CHAPTER
+8
+RNNs and LSTMs
+Time will explain.
+Jane Austen, Persuasion
+Language is an inherently temporal phenomenon. Spoken language is a sequence of
+acoustic events over time, and we comprehend and produce both spoken and written
+language as a sequential input stream. The temporal nature of language is reﬂected
+in the metaphors we use; we talk of the ﬂow of conversations, news feeds, and twitter
+streams, all of which emphasize that language is a sequence that unfolds in time.
+This temporal nature is reﬂected in some language processing algorithms. For
+example, the Viterbi algorithm we introduced for HMM part-of-speech tagging pro-
+ceeds through the input a word at a time, carrying forward information gleaned along
+the way. But other machine learning approaches, like those we’ve studied for senti-
+ment analysis or other text classiﬁcation tasks don’t have this temporal nature – they
+assume simultaneous access to all aspects of their input.
+The feedforward networks of Chapter 7 also assumed simultaneous access, al-
+though they also had a simple model for time. Recall that we applied feedforward
+networks to language modeling by having them look only at a ﬁxed-size window
+of words, and then sliding this window over the input, making independent predic-
+tions along the way. This sliding-window approach is also used in the transformer
+architecture we will introduce in Chapter 9.
+This chapter introduces a deep learning architecture that offers an alternative
+way of representing time: recurrent neural networks (RNNs), and their variants like
+LSTMs. RNNs have a mechanism that deals directly with the sequential nature of
+language, allowing them to handle the temporal nature of language without the use of
+arbitrary ﬁxed-sized windows. The recurrent network offers a new way to represent
+the prior context, in its recurrent connections, allowing the model’s decision to
+depend on information from hundreds of words in the past. We’ll see how to apply
+the model to the task of language modeling, to sequence modeling tasks like part-
+of-speech tagging, and to text classiﬁcation tasks like sentiment analysis.
+8.1
+Recurrent Neural Networks
+A recurrent neural network (RNN) is any network that contains a cycle within its
+network connections, meaning that the value of some unit is directly, or indirectly,
+dependent on its own earlier outputs as an input. While powerful, such networks
+are difﬁcult to reason about and to train. However, within the general class of recur-
+rent networks there are constrained architectures that have proven to be extremely
+effective when applied to language. In this section, we consider a class of recurrent
+networks referred to as Elman Networks (Elman, 1990) or simple recurrent net-
+Elman
+Networks
+2
+CHAPTER 8
+•
+RNNS AND LSTMS
+works. These networks are useful in their own right and serve as the basis for more
+complex approaches like the Long Short-Term Memory (LSTM) networks discussed
+later in this chapter. In this chapter when we use the term RNN we’ll be referring to
+these simpler more constrained networks (although you will often see the term RNN
+to mean any net with recurrent properties including LSTMs).
+xt
+ht
+yt
+Figure 8.1
+Simple recurrent neural network after Elman (1990). The hidden layer includes
+a recurrent connection as part of its input. That is, the activation value of the hidden layer
+depends on the current input as well as the activation value of the hidden layer from the
+previous time step.
+Fig. 8.1 illustrates the structure of an RNN. As with ordinary feedforward net-
+works, an input vector representing the current input, xt, is multiplied by a weight
+matrix and then passed through a non-linear activation function to compute the val-
+ues for a layer of hidden units. This hidden layer is then used to calculate a cor-
+responding output, yt. In a departure from our earlier window-based approach, se-
+quences are processed by presenting one item at a time to the network. We’ll use
+subscripts to represent time, thus xt will mean the input vector x at time t. The key
+difference from a feedforward network lies in the recurrent link shown in the ﬁgure
+with the dashed line. This link augments the input to the computation at the hidden
+layer with the value of the hidden layer from the preceding point in time.
+The hidden layer from the previous time step provides a form of memory, or
+context, that encodes earlier processing and informs the decisions to be made at
+later points in time. Critically, this approach does not impose a ﬁxed-length limit
+on this prior context; the context embodied in the previous hidden layer can include
+information extending back to the beginning of the sequence.
+Adding this temporal dimension makes RNNs appear to be more complex than
+non-recurrent architectures. But in reality, they’re not all that different. Given an
+input vector and the values for the hidden layer from the previous time step, we’re
+still performing the standard feedforward calculation introduced in Chapter 7. To
+see this, consider Fig. 8.2 which clariﬁes the nature of the recurrence and how it
+factors into the computation at the hidden layer. The most signiﬁcant change lies in
+the new set of weights, U, that connect the hidden layer from the previous time step
+to the current hidden layer. These weights determine how the network makes use of
+past context in calculating the output for the current input. As with the other weights
+in the network, these connections are trained via backpropagation.
+8.1.1
+Inference in RNNs
+Forward inference (mapping a sequence of inputs to a sequence of outputs) in an
+RNN is nearly identical to what we’ve already seen with feedforward networks. To
+compute an output yt for an input xt, we need the activation value for the hidden
+layer ht. To calculate this, we multiply the input xt with the weight matrix W, and
+the hidden layer from the previous time step ht−1 with the weight matrix U. We
+add these values together and pass them through a suitable activation function, g,
+to arrive at the activation value for the current hidden layer, ht. Once we have the
+8.1
+•
+RECURRENT NEURAL NETWORKS
+3
++
+U
+V
+W
+yt
+xt
+ht
+ht-1
+Figure 8.2
+Simple recurrent neural network illustrated as a feedforward network. The hid-
+den layer ht−1 from the prior time step is multiplied by weight matrix U and then added to
+the feedforward component from the current time step.
+values for the hidden layer, we proceed with the usual computation to generate the
+output vector.
+ht = g(Uht−1 +Wxt)
+(8.1)
+yt = f(Vht)
+(8.2)
+Let’s refer to the input, hidden and output layer dimensions as din, dh, and dout
+respectively. Given this, our three parameter matrices are: W ∈Rdh×din, U ∈Rdh×dh,
+and V ∈Rdout×dh.
+We compute yt via a softmax computation that gives a probability distribution
+over the possible output classes.
+yt = softmax(Vht)
+(8.3)
+The fact that the computation at time t requires the value of the hidden layer from
+time t −1 mandates an incremental inference algorithm that proceeds from the start
+of the sequence to the end as illustrated in Fig. 8.3. The sequential nature of simple
+recurrent networks can also be seen by unrolling the network in time as is shown in
+Fig. 8.4. In this ﬁgure, the various layers of units are copied for each time step to
+illustrate that they will have differing values over time. However, the various weight
+matrices are shared across time.
+function FORWARDRNN(x,network) returns output sequence y
+h0 ←0
+for i←1 to LENGTH(x) do
+hi ←g(Uhi−1 + Wxi)
+yi ←f(Vhi)
+return y
+Figure 8.3
+Forward inference in a simple recurrent network. The matrices U, V and W are
+shared across time, while new values for h and y are calculated with each time step.
+8.1.2
+Training
+As with feedforward networks, we’ll use a training set, a loss function, and back-
+propagation to obtain the gradients needed to adjust the weights in these recurrent
+4
+CHAPTER 8
+•
+RNNS AND LSTMS
+U
+V
+W
+U
+V
+W
+U
+V
+W
+x1
+x2
+x3
+y1
+y2
+y3
+h1
+h3
+h2
+h0
+Figure 8.4
+A simple recurrent neural network shown unrolled in time. Network layers are recalculated for
+each time step, while the weights U, V and W are shared across all time steps.
+networks. As shown in Fig. 8.2, we now have 3 sets of weights to update: W, the
+weights from the input layer to the hidden layer, U, the weights from the previous
+hidden layer to the current hidden layer, and ﬁnally V, the weights from the hidden
+layer to the output layer.
+Fig. 8.4 highlights two considerations that we didn’t have to worry about with
+backpropagation in feedforward networks. First, to compute the loss function for
+the output at time t we need the hidden layer from time t −1. Second, the hidden
+layer at time t inﬂuences both the output at time t and the hidden layer at time t +1
+(and hence the output and loss at t +1). It follows from this that to assess the error
+accruing to ht, we’ll need to know its inﬂuence on both the current output as well as
+the ones that follow.
+Tailoring the backpropagation algorithm to this situation leads to a two-pass al-
+gorithm for training the weights in RNNs. In the ﬁrst pass, we perform forward
+inference, computing ht, yt, accumulating the loss at each step in time, saving the
+value of the hidden layer at each step for use at the next time step. In the second
+phase, we process the sequence in reverse, computing the required gradients as we
+go, computing and saving the error term for use in the hidden layer for each step
+backward in time. This general approach is commonly referred to as backpropaga-
+tion through time (Werbos 1974, Rumelhart et al. 1986, Werbos 1990).
+backpropaga-
+tion through
+time
+Fortunately, with modern computational frameworks and adequate computing
+resources, there is no need for a specialized approach to training RNNs. As illus-
+trated in Fig. 8.4, explicitly unrolling a recurrent network into a feedforward com-
+putational graph eliminates any explicit recurrences, allowing the network weights
+to be trained directly. In such an approach, we provide a template that speciﬁes the
+basic structure of the network, including all the necessary parameters for the input,
+output, and hidden layers, the weight matrices, as well as the activation and output
+functions to be used. Then, when presented with a speciﬁc input sequence, we can
+generate an unrolled feedforward network speciﬁc to that input, and use that graph
+8.2
+•
+RNNS AS LANGUAGE MODELS
+5
+to perform forward inference or training via ordinary backpropagation.
+For applications that involve much longer input sequences, such as speech recog-
+nition, character-level processing, or streaming continuous inputs, unrolling an en-
+tire input sequence may not be feasible. In these cases, we can unroll the input into
+manageable ﬁxed-length segments and treat each segment as a distinct training item.
+8.2
+RNNs as Language Models
+Let’s see how to apply RNNs to the language modeling task. Recall from Chapter 3
+that language models predict the next word in a sequence given some preceding
+context. For example, if the preceding context is “Thanks for all the” and we want
+to know how likely the next word is “ﬁsh” we would compute:
+P(ﬁsh|Thanks for all the)
+Language models give us the ability to assign such a conditional probability to every
+possible next word, giving us a distribution over the entire vocabulary. We can also
+assign probabilities to entire sequences by combining these conditional probabilities
+with the chain rule:
+P(w1:n) =
+n
+Y
+i=1
+P(wi|w<i)
+The n-gram language models of Chapter 3 compute the probability of a word given
+counts of its occurrence with the n−1 prior words. The context is thus of size n−1.
+For the feedforward language models of Chapter 7, the context is the window size.
+RNN language models (Mikolov et al., 2010) process the input sequence one
+word at a time, attempting to predict the next word from the current word and the
+previous hidden state. RNNs thus don’t have the limited context problem that n-gram
+models have, or the ﬁxed context that feedforward language models have, since the
+hidden state can in principle represent information about all of the preceding words
+all the way back to the beginning of the sequence. Fig. 8.5 sketches this difference
+between a FFN language model and an RNN language model, showing that the
+RNN language model uses ht−1, the hidden state from the previous time step, as a
+representation of the past context.
+8.2.1
+Forward Inference in an RNN language model
+Forward inference in a recurrent language model proceeds exactly as described in
+Section 8.1.1. The input sequence X = [x1;...;xt;...;xN] consists of a series of words
+each represented as a one-hot vector of size |V|×1, and the output prediction, y, is a
+vector representing a probability distribution over the vocabulary. At each step, the
+model uses the word embedding matrix E to retrieve the embedding for the current
+word, multiples it by the weight matrix W, and then adds it to the hidden layer from
+the previous step (weighted by weight matrix U to compute a new hidden layer.
+This hidden layer is then used to generate an output layer which is passed through a
+softmax layer to generate a probability distribution over the entire vocabulary. That
+6
+CHAPTER 8
+•
+RNNS AND LSTMS
+V
+W
+et
+ht
+U
+ht-1
+et
+ht
+et-1
+et-2
+U
+       W
+a)
+b)
+^yt
+et-1
+^yt
+ht-1
+W
+W
+et-2
+U
+Figure 8.5
+Simpliﬁed sketch of two LM architectures moving through a text, showing a
+schematic context of three tokens: (a) a feedforward neural language model which has a ﬁxed
+context input to the weight matrix W, (b) an RNN language model, in which the hidden state
+ht−1 summarizes the prior context.
+is, at time t:
+et = Ext
+(8.4)
+ht = g(Uht−1 +Wet)
+(8.5)
+ˆyt = softmax(Vht)
+(8.6)
+When we do language modeling with RNNs (and we’ll see this again in Chapter 9
+with transformers), it’s convenient to make the assumption that the embedding di-
+mension de and the hidden dimension dh are the same. So we’ll just call both of
+these the model dimension d. So the embedding matrix E is of shape [d ×|V|], and
+xt is a one-hot vector of shape [|V|×1]. The product et is thus of shape [d ×1]. W
+and U are of shape [d × d], so ht is also of shape [d × 1]. V is of shape [|V| × d],
+so the result of Vh is a vector of shape [|V| × 1]. This vector can be thought of as
+a set of scores over the vocabulary given the evidence provided in h. Passing these
+scores through the softmax normalizes the scores into a probability distribution. The
+probability that a particular word k in the vocabulary is the next word is represented
+by ˆyt[k], the kth component of ˆyt:
+P(wt+1 = k|w1,...,wt) = ˆyt[k]
+(8.7)
+The probability of an entire sequence is just the product of the probabilities of each
+item in the sequence, where we’ll use ˆyi[wi] to mean the probability of the true word
+wi at time step i.
+P(w1:n) =
+n
+Y
+i=1
+P(wi|w1:i−1)
+(8.8)
+=
+n
+Y
+i=1
+ˆyi[wi]
+(8.9)
+8.2.2
+Training an RNN language model
+To train an RNN as a language model, we use the same self-supervision (or self-
+self-supervision
+training) algorithm we saw in Section ??: we take a corpus of text as training
+8.2
+•
+RNNS AS LANGUAGE MODELS
+7
+Input
+Embeddings
+Softmax over
+Vocabulary
+So
+long
+and
+thanks
+for
+long
+and
+thanks
+for
+Next word
+all
+…
+Loss
+…
+…
+RNN
+h
+y
+Vh
+−log ˆylong
+−log ˆyand
+−log ˆythanks
+−log ˆyfor
+−log ˆyall
+e
+Figure 8.6
+Training RNNs as language models.
+material and at each time step t ask the model to predict the next word. We call
+such a model self-supervised because we don’t have to add any special gold labels
+to the data; the natural sequence of words is its own supervision! We simply train
+the model to minimize the error in predicting the true next word in the training
+sequence, using cross-entropy as the loss function. Recall that the cross-entropy
+loss measures the difference between a predicted probability distribution and the
+correct distribution.
+LCE = −
+X
+w∈V
+yt[w]log ˆyt[w]
+(8.10)
+In the case of language modeling, the correct distribution yt comes from knowing the
+next word. This is represented as a one-hot vector corresponding to the vocabulary
+where the entry for the actual next word is 1, and all the other entries are 0. Thus,
+the cross-entropy loss for language modeling is determined by the probability the
+model assigns to the correct next word. So at time t the CE loss is the negative log
+probability the model assigns to the next word in the training sequence.
+LCE( ˆyt,yt) = −log ˆyt[wt+1]
+(8.11)
+Thus at each word position t of the input, the model takes as input the the correct
+word wt together with ht−1, encoding information from the preceding w1:t−1, and
+uses them to compute a probability distribution over possible next words so as to
+compute the model’s loss for the next token wt+1. Then we move to the next word,
+we ignore what the model predicted for the next word and instead use the correct
+word wt+1 along with the prior history encoded to estimate the probability of token
+wt+2. This idea that we always give the model the correct history sequence to predict
+the next word (rather than feeding the model its best case from the previous time
+step) is called teacher forcing.
+teacher forcing
+The weights in the network are adjusted to minimize the average CE loss over
+the training sequence via gradient descent. Fig. 8.6 illustrates this training regimen.
+8.2.3
+Weight Tying
+Careful readers may have noticed that the input embedding matrix E and the ﬁnal
+layer matrix V, which feeds the output softmax, are quite similar.
+8
+CHAPTER 8
+•
+RNNS AND LSTMS
+The columns of E represent the word embeddings for each word in the vocab-
+ulary learned during the training process with the goal that words that have similar
+meaning and function will have similar embeddings. And, since when we use RNNs
+for language modeling we make the assumption that the embedding dimension and
+the hidden dimension are the same (= the model dimension d), the embedding ma-
+trix E has shape [d × |V|]. And the ﬁnal layer matrix V provides a way to score
+the likelihood of each word in the vocabulary given the evidence present in the ﬁnal
+hidden layer of the network through the calculation of Vh. V is of shape [|V|×d].
+That is, is, the rows of V are shaped like a transpose of E, meaning that V provides
+a second set of learned word embeddings.
+Instead of having two sets of embedding matrices, language models use a single
+embedding matrix, which appears at both the input and softmax layers. That is,
+we dispense with V and use E at the start of the computation and E⊺(because the
+shape of V is the transpose of E at the end. Using the same matrix (transposed) in
+two places is called weight tying.1 The weight-tied equations for an RNN language
+weight tying
+model then become:
+et = Ext
+(8.12)
+ht = g(Uht−1 +Wet)
+(8.13)
+ˆyt = softmax(E⊺ht)
+(8.14)
+In addition to providing improved model perplexity, this approach signiﬁcantly re-
+duces the number of parameters required for the model.
+8.3
+RNNs for other NLP tasks
+Now that we’ve seen the basic RNN architecture, let’s consider how to apply it to
+three types of NLP tasks: sequence classiﬁcation tasks like sentiment analysis and
+topic classiﬁcation, sequence labeling tasks like part-of-speech tagging, and text
+generation tasks, including with a new architecture called the encoder-decoder.
+8.3.1
+Sequence Labeling
+In sequence labeling, the network’s task is to assign a label chosen from a small
+ﬁxed set of labels to each element of a sequence, like the part-of-speech tagging and
+named entity recognition tasks from Chapter 17. In an RNN approach to sequence
+labeling, inputs are word embeddings and the outputs are tag probabilities generated
+by a softmax layer over the given tagset, as illustrated in Fig. 8.7.
+In this ﬁgure, the inputs at each time step are pretrained word embeddings cor-
+responding to the input tokens. The RNN block is an abstraction that represents
+an unrolled simple recurrent network consisting of an input layer, hidden layer, and
+output layer at each time step, as well as the shared U, V and W weight matrices
+that comprise the network. The outputs of the network at each time step represent
+the distribution over the POS tagset generated by a softmax layer.
+To generate a sequence of tags for a given input, we run forward inference over
+the input sequence and select the most likely tag from the softmax at each step. Since
+we’re using a softmax layer to generate the probability distribution over the output
+tagset at each time step, we will again employ the cross-entropy loss during training.
+1
+We also do this for transformers (Chapter 9) where it’s common to call E⊺the unembedding matrix.
+8.3
+•
+RNNS FOR OTHER NLP TASKS
+9
+Janet
+will
+back
+the
+bill
+NN
+DT
+VB
+MD
+NNP
+Argmax
+Embeddings
+Words
+e
+h
+Vh
+y
+RNN
+Layer(s)
+Softmax over
+tags
+Figure 8.7
+Part-of-speech tagging as sequence labeling with a simple RNN. Pre-trained
+word embeddings serve as inputs and a softmax layer provides a probability distribution over
+the part-of-speech tags as output at each time step.
+8.3.2
+RNNs for Sequence Classiﬁcation
+Another use of RNNs is to classify entire sequences rather than the tokens within
+them. This is the set of tasks commonly called text classiﬁcation, like sentiment
+analysis or spam detection, in which we classify a text into two or three classes
+(like positive or negative), as well as classiﬁcation tasks with a large number of
+categories, like document-level topic classiﬁcation, or message routing for customer
+service applications.
+To apply RNNs in this setting, we pass the text to be classiﬁed through the RNN
+a word at a time generating a new hidden layer representation at each time step.
+We can then take the hidden layer for the last token of the text, hn, to constitute a
+compressed representation of the entire sequence. We can pass this representation
+hn to a feedforward network that chooses a class via a softmax over the possible
+classes. Fig. 8.8 illustrates this approach.
+x1
+RNN
+hn
+x2
+x3
+xn
+Softmax
+FFN
+Figure 8.8
+Sequence classiﬁcation using a simple RNN combined with a feedforward net-
+work. The ﬁnal hidden state from the RNN is used as the input to a feedforward network that
+performs the classiﬁcation.
+Note that in this approach we don’t need intermediate outputs for the words in
+the sequence preceding the last element. Therefore, there are no loss terms associ-
+10
+CHAPTER 8
+•
+RNNS AND LSTMS
+ated with those elements. Instead, the loss function used to train the weights in the
+network is based entirely on the ﬁnal text classiﬁcation task. The output from the
+softmax output from the feedforward classiﬁer together with a cross-entropy loss
+drives the training. The error signal from the classiﬁcation is backpropagated all the
+way through the weights in the feedforward classiﬁer through, to its input, and then
+through to the three sets of weights in the RNN as described earlier in Section 8.1.2.
+The training regimen that uses the loss from a downstream application to adjust the
+weights all the way through the network is referred to as end-to-end training.
+end-to-end
+training
+Another option, instead of using just hidden state of the last token hn to represent
+the whole sequence, is to use some sort of pooling function of all the hidden states
+pooling
+hi for each word i in the sequence. For example, we can create a representation that
+pools all the n hidden states by taking their element-wise mean:
+hmean = 1
+n
+n
+X
+i=1
+hi
+(8.15)
+Or we can take the element-wise max; the element-wise max of a set of n vectors is
+a new vector whose kth element is the max of the kth elements of all the n vectors.
+The long contexts of RNNs makes it quite difﬁcult to successfully backpropagate
+error all the way through the entire input; we’ll talk about this problem, and some
+standard solutions, in Section 8.5.
+8.3.3
+Generation with RNN-Based Language Models
+RNN-based language models can also be used to generate text. Text generation is
+of enormous practical importance, part of tasks like question answering, machine
+translation, text summarization, grammar correction, story generation, and conver-
+sational dialogue; any task where a system needs to produce text, conditioned on
+some other text. This use of a language model to generate text is one of the areas
+in which the impact of neural language models on NLP has been the largest. Text
+generation, along with image generation and code generation, constitute a new area
+of AI that is often called generative AI.
+Recall back in Chapter 3 we saw how to generate text from an n-gram language
+model by adapting a sampling technique suggested at about the same time by Claude
+Shannon (Shannon, 1951) and the psychologists George Miller and Jennifer Self-
+ridge (Miller and Selfridge, 1950). We ﬁrst randomly sample a word to begin a
+sequence based on its suitability as the start of a sequence. We then continue to
+sample words conditioned on our previous choices until we reach a pre-determined
+length, or an end of sequence token is generated.
+Today, this approach of using a language model to incrementally generate words
+by repeatedly sampling the next word conditioned on our previous choices is called
+autoregressive generation or causal LM generation. The procedure is basically
+autoregressive
+generation
+the same as that described on page ??, but adapted to a neural context:
+• Sample a word in the output from the softmax distribution that results from
+using the beginning of sentence marker, <s>, as the ﬁrst input.
+• Use the word embedding for that ﬁrst word as the input to the network at the
+next time step, and then sample the next word in the same fashion.
+• Continue generating until the end of sentence marker, </s>, is sampled or a
+ﬁxed length limit is reached.
+Technically an autoregressive model is a model that predicts a value at time t based
+on a linear function of the previous values at times t −1, t −2, and so on. Although
+8.4
+•
+STACKED AND BIDIRECTIONAL RNN ARCHITECTURES
+11
+language models are not linear (since they have many layers of non-linearities), we
+loosely refer to this generation technique as autoregressive generation since the
+word generated at each time step is conditioned on the word selected by the network
+from the previous step. Fig. 8.9 illustrates this approach. In this ﬁgure, the details of
+the RNN’s hidden layers and recurrent connections are hidden within the blue block.
+This simple architecture underlies state-of-the-art approaches to applications
+such as machine translation, summarization, and question answering. The key to
+these approaches is to prime the generation component with an appropriate context.
+That is, instead of simply using <s> to get things started we can provide a richer
+task-appropriate context; for translation the context is the sentence in the source
+language; for summarization it’s the long text we want to summarize.
+So
+long
+<s>
+and
+So
+long
+and
+?
+Sampled Word
+Softmax
+Embedding
+Input Word
+RNN
+Figure 8.9
+Autoregressive generation with an RNN-based neural language model.
+8.4
+Stacked and Bidirectional RNN architectures
+Recurrent networks are quite ﬂexible. By combining the feedforward nature of un-
+rolled computational graphs with vectors as common inputs and outputs, complex
+networks can be treated as modules that can be combined in creative ways. This
+section introduces two of the more common network architectures used in language
+processing with RNNs.
+8.4.1
+Stacked RNNs
+In our examples thus far, the inputs to our RNNs have consisted of sequences of
+word or character embeddings (vectors) and the outputs have been vectors useful for
+predicting words, tags or sequence labels. However, nothing prevents us from using
+the entire sequence of outputs from one RNN as an input sequence to another one.
+Stacked RNNs consist of multiple networks where the output of one layer serves as
+Stacked RNNs
+the input to a subsequent layer, as shown in Fig. 8.10.
+Stacked RNNs generally outperform single-layer networks. One reason for this
+success seems to be that the network induces representations at differing levels of
+abstraction across layers. Just as the early stages of the human visual system detect
+12
+CHAPTER 8
+•
+RNNS AND LSTMS
+y1
+y2
+y3
+yn
+x1
+x2
+x3
+xn
+RNN 1
+RNN 2
+ RNN 3
+Figure 8.10
+Stacked recurrent networks. The output of a lower level serves as the input to
+higher levels with the output of the last network serving as the ﬁnal output.
+edges that are then used for ﬁnding larger regions and shapes, the initial layers of
+stacked networks can induce representations that serve as useful abstractions for
+further layers—representations that might prove difﬁcult to induce in a single RNN.
+The optimal number of stacked RNNs is speciﬁc to each application and to each
+training set. However, as the number of stacks is increased the training costs rise
+quickly.
+8.4.2
+Bidirectional RNNs
+The RNN uses information from the left (prior) context to make its predictions at
+time t. But in many applications we have access to the entire input sequence; in
+those cases we would like to use words from the context to the right of t. One way
+to do this is to run two separate RNNs, one left-to-right, and one right-to-left, and
+concatenate their representations.
+In the left-to-right RNNs we’ve discussed so far, the hidden state at a given time
+t represents everything the network knows about the sequence up to that point. The
+state is a function of the inputs x1,...,xt and represents the context of the network to
+the left of the current time.
+h f
+t = RNNforward(x1,...,xt)
+(8.16)
+This new notation h f
+t simply corresponds to the normal hidden state at time t, repre-
+senting everything the network has gleaned from the sequence so far.
+To take advantage of context to the right of the current input, we can train an
+RNN on a reversed input sequence. With this approach, the hidden state at time t
+represents information about the sequence to the right of the current input:
+hb
+t = RNNbackward(xt,... xn)
+(8.17)
+Here, the hidden state hb
+t represents all the information we have discerned about the
+sequence from t to the end of the sequence.
+A bidirectional RNN (Schuster and Paliwal, 1997) combines two independent
+bidirectional
+RNN
+RNNs, one where the input is processed from the start to the end, and the other from
+the end to the start. We then concatenate the two representations computed by the
+networks into a single vector that captures both the left and right contexts of an input
+8.5
+•
+THE LSTM
+13
+at each point in time. Here we use either the semicolon ”;” or the equivalent symbol
+⊕to mean vector concatenation:
+ht = [h f
+t ; hb
+t]
+= h f
+t ⊕hb
+t
+(8.18)
+Fig. 8.11 illustrates such a bidirectional network that concatenates the outputs of
+the forward and backward pass. Other simple ways to combine the forward and
+backward contexts include element-wise addition or multiplication. The output at
+each step in time thus captures information to the left and to the right of the current
+input. In sequence labeling applications, these concatenated outputs can serve as the
+basis for a local labeling decision.
+RNN 2 
+RNN 1
+x1
+y2
+y1
+y3
+yn
+concatenated
+outputs
+x2
+x3
+xn
+Figure 8.11
+A bidirectional RNN. Separate models are trained in the forward and backward
+directions, with the output of each model at each time point concatenated to represent the
+bidirectional state at that time point.
+Bidirectional RNNs have also proven to be quite effective for sequence classiﬁ-
+cation. Recall from Fig. 8.8 that for sequence classiﬁcation we used the ﬁnal hidden
+state of the RNN as the input to a subsequent feedforward classiﬁer. A difﬁculty
+with this approach is that the ﬁnal state naturally reﬂects more information about
+the end of the sentence than its beginning. Bidirectional RNNs provide a simple
+solution to this problem; as shown in Fig. 8.12, we simply combine the ﬁnal hidden
+states from the forward and backward passes (for example by concatenation) and
+use that as input for follow-on processing.
+8.5
+The LSTM
+In practice, it is quite difﬁcult to train RNNs for tasks that require a network to make
+use of information distant from the current point of processing. Despite having ac-
+cess to the entire preceding sequence, the information encoded in hidden states tends
+to be fairly local, more relevant to the most recent parts of the input sequence and
+recent decisions. Yet distant information is critical to many language applications.
+Consider the following example in the context of language modeling.
+14
+CHAPTER 8
+•
+RNNS AND LSTMS
+RNN 2 
+RNN 1
+x1
+x2
+x3
+xn
+hn
+→
+h1
+←
+hn
+→
+Softmax
+FFN
+h1
+←
+Figure 8.12
+A bidirectional RNN for sequence classiﬁcation. The ﬁnal hidden units from
+the forward and backward passes are combined to represent the entire sequence. This com-
+bined representation serves as input to the subsequent classiﬁer.
+(8.19) The ﬂights the airline was canceling were full.
+Assigning a high probability to was following airline is straightforward since airline
+provides a strong local context for the singular agreement. However, assigning an
+appropriate probability to were is quite difﬁcult, not only because the plural ﬂights
+is quite distant, but also because the singular noun airline is closer in the intervening
+context. Ideally, a network should be able to retain the distant information about
+plural ﬂights until it is needed, while still processing the intermediate parts of the
+sequence correctly.
+One reason for the inability of RNNs to carry forward critical information is that
+the hidden layers, and, by extension, the weights that determine the values in the hid-
+den layer, are being asked to perform two tasks simultaneously: provide information
+useful for the current decision, and updating and carrying forward information re-
+quired for future decisions.
+A second difﬁculty with training RNNs arises from the need to backpropagate
+the error signal back through time. Recall from Section 8.1.2 that the hidden layer at
+time t contributes to the loss at the next time step since it takes part in that calcula-
+tion. As a result, during the backward pass of training, the hidden layers are subject
+to repeated multiplications, as determined by the length of the sequence. A frequent
+result of this process is that the gradients are eventually driven to zero, a situation
+called the vanishing gradients problem.
+vanishing
+gradients
+To address these issues, more complex network architectures have been designed
+to explicitly manage the task of maintaining relevant context over time, by enabling
+the network to learn to forget information that is no longer needed and to remember
+information required for decisions still to come.
+The most commonly used such extension to RNNs is the long short-term mem-
+ory (LSTM) network (Hochreiter and Schmidhuber, 1997). LSTMs divide the con-
+long short-term
+memory
+text management problem into two subproblems: removing information no longer
+needed from the context, and adding information likely to be needed for later de-
+8.5
+•
+THE LSTM
+15
+cision making. The key to solving both problems is to learn how to manage this
+context rather than hard-coding a strategy into the architecture. LSTMs accomplish
+this by ﬁrst adding an explicit context layer to the architecture (in addition to the
+usual recurrent hidden layer), and through the use of specialized neural units that
+make use of gates to control the ﬂow of information into and out of the units that
+comprise the network layers. These gates are implemented through the use of addi-
+tional weights that operate sequentially on the input, and previous hidden layer, and
+previous context layers.
+The gates in an LSTM share a common design pattern; each consists of a feed-
+forward layer, followed by a sigmoid activation function, followed by a pointwise
+multiplication with the layer being gated. The choice of the sigmoid as the activation
+function arises from its tendency to push its outputs to either 0 or 1. Combining this
+with a pointwise multiplication has an effect similar to that of a binary mask. Values
+in the layer being gated that align with values near 1 in the mask are passed through
+nearly unchanged; values corresponding to lower values are essentially erased.
+The ﬁrst gate we’ll consider is the forget gate. The purpose of this gate is
+forget gate
+to delete information from the context that is no longer needed. The forget gate
+computes a weighted sum of the previous state’s hidden layer and the current in-
+put and passes that through a sigmoid. This mask is then multiplied element-wise
+by the context vector to remove the information from context that is no longer re-
+quired. Element-wise multiplication of two vectors (represented by the operator ⊙,
+and sometimes called the Hadamard product) is the vector of the same dimension
+as the two input vectors, where each element i is the product of element i in the two
+input vectors:
+ft = σ(Uf ht−1 +Wf xt)
+(8.20)
+kt = ct−1 ⊙ft
+(8.21)
+The next task is to compute the actual information we need to extract from the previ-
+ous hidden state and current inputs—the same basic computation we’ve been using
+for all our recurrent networks.
+gt = tanh(Ught−1 +Wgxt)
+(8.22)
+Next, we generate the mask for the add gate to select the information to add to the
+add gate
+current context.
+it = σ(Uiht−1 +Wixt)
+(8.23)
+jt = gt ⊙it
+(8.24)
+Next, we add this to the modiﬁed context vector to get our new context vector.
+ct = jt +kt
+(8.25)
+The ﬁnal gate we’ll use is the output gate which is used to decide what informa-
+output gate
+tion is required for the current hidden state (as opposed to what information needs
+to be preserved for future decisions).
+ot = σ(Uoht−1 +Woxt)
+(8.26)
+ht = ot ⊙tanh(ct)
+(8.27)
+Fig. 8.13 illustrates the complete computation for a single LSTM unit. Given the
+16
+CHAPTER 8
+•
+RNNS AND LSTMS
++
+xt
+ht-1
+ct
+ht
+ct
+ht
+ct-1
+ht-1
+xt
+tanh
++
+σ
+tanh
+σ
+σ
++
++
++
+i
+g
+f
+o
+⦿
+⦿
+⦿
+LSTM
+ct-1
+Figure 8.13
+A single LSTM unit displayed as a computation graph. The inputs to each unit consists of the
+current input, x, the previous hidden state, ht−1, and the previous context, ct−1. The outputs are a new hidden
+state, ht and an updated context, ct.
+appropriate weights for the various gates, an LSTM accepts as input the context
+layer, and hidden layer from the previous time step, along with the current input
+vector. It then generates updated context and hidden vectors as output.
+It is the hidden state, ht, that provides the output for the LSTM at each time step.
+This output can be used as the input to subsequent layers in a stacked RNN, or at the
+ﬁnal layer of a network ht can be used to provide the ﬁnal output of the LSTM.
+8.5.1
+Gated Units, Layers and Networks
+The neural units used in LSTMs are obviously much more complex than those used
+in basic feedforward networks. Fortunately, this complexity is encapsulated within
+the basic processing units, allowing us to maintain modularity and to easily exper-
+iment with different architectures. To see this, consider Fig. 8.14 which illustrates
+the inputs and outputs associated with each kind of unit.
+At the far left, (a) is the basic feedforward unit where a single set of weights and
+a single activation function determine its output, and when arranged in a layer there
+are no connections among the units in the layer. Next, (b) represents the unit in a
+simple recurrent network. Now there are two inputs and an additional set of weights
+to go with it. However, there is still a single activation function and output.
+The increased complexity of the LSTM units is encapsulated within the unit
+itself. The only additional external complexity for the LSTM over the basic recurrent
+unit (b) is the presence of the additional context vector as an input and output.
+This modularity is key to the power and widespread applicability of LSTM units.
+LSTM units (or other varieties, like GRUs) can be substituted into any of the network
+architectures described in Section 8.4. And, as with simple RNNs, multi-layered
+networks making use of gated units can be unrolled into deep feedforward networks
+and trained in the usual fashion with backpropagation. In practice, therefore, LSTMs
+rather than RNNs have become the standard unit for any modern system that makes
+use of recurrent networks.
+8.6
+•
+SUMMARY: COMMON RNN NLP ARCHITECTURES
+17
+h
+x
+xt
+xt
+ht-1
+ht
+ht
+ct-1
+ct
+ht-1
+(b)
+(a)
+(c)
+⌃
+g
+z
+a
+⌃
+g
+z
+LSTM
+Unit
+a
+Figure 8.14
+Basic neural units used in feedforward, simple recurrent networks (SRN), and
+long short-term memory (LSTM).
+8.6
+Summary: Common RNN NLP Architectures
+We’ve now introduced the RNN, seen advanced components like stacking multiple
+layers and using the LSTM version, and seen how the RNN can be applied to various
+tasks. Let’s take a moment to summarize the architectures for these applications.
+Fig. 8.15 shows the three architectures we’ve discussed so far: sequence la-
+beling, sequence classiﬁcation, and language modeling. In sequence labeling (for
+example for part of speech tagging), we train a model to produce a label for each
+input word or token. In sequence classiﬁcation, for example for sentiment analysis,
+we ignore the output for each token, and only take the value from the end of the
+sequence (and similarly the model’s training signal comes from backpropagation
+from that last token). In language modeling, we train the model to predict the next
+word at each token step. In the next section we’ll introduce a fourth architecture, the
+encoder-decoder.
+8.7
+The Encoder-Decoder Model with RNNs
+In this section we introduce a new model, the encoder-decoder model, which is used
+when we are taking an input sequence and translating it to an output sequence that is
+of a different length than the input, and doesn’t align with it in a word-to-word way.
+Recall that in the sequence labeling task, we have two sequences, but they are the
+same length (for example in part-of-speech tagging each token gets an associated
+tag), each input is associated with a speciﬁc output, and the labeling for that output
+takes mostly local information. Thus deciding whether a word is a verb or a noun,
+we look mostly at the word and the neighboring words.
+By contrast, encoder-decoder models are used especially for tasks like machine
+translation, where the input sequence and output sequence can have different lengths
+and the mapping between a token in the input and a token in the output can be very
+indirect (in some languages the verb appears at the beginning of the sentence; in
+other languages at the end). We’ll introduce machine translation in detail in Chap-
+ter 13, but for now we’ll just point out that the mapping for a sentence in English to
+a sentence in Tagalog or Yoruba can have very different numbers of words, and the
+18
+CHAPTER 8
+•
+RNNS AND LSTMS
+…
+Encoder RNN
+Decoder RNN
+Context
+…
+x1
+x2
+xn
+y1
+y2
+ym
+…
+RNN
+x1
+x2
+xn
+…
+y1
+y2
+yn
+…
+RNN
+x1
+x2
+xn
+y
+…
+RNN
+x1
+x2
+xt-1
+…
+x2
+x3
+xt
+a) sequence labeling 
+b) sequence classification 
+c) language modeling
+d) encoder-decoder
+Figure 8.15
+Four architectures for NLP tasks. In sequence labeling (POS or named entity tagging) we map
+each input token xi to an output token yi. In sequence classiﬁcation we map the entire input sequence to a single
+class. In language modeling we output the next token conditioned on previous tokens. In the encoder model we
+have two separate RNN models, one of which maps from an input sequence x to an intermediate representation
+we call the context, and a second of which maps from the context to an output sequence y.
+words can be in a very different order.
+Encoder-decoder networks, sometimes called sequence-to-sequence networks,
+encoder-
+decoder
+are models capable of generating contextually appropriate, arbitrary length, output
+sequences given an input sequence. Encoder-decoder networks have been applied
+to a very wide range of applications including summarization, question answering,
+and dialogue, but they are particularly popular for machine translation.
+The key idea underlying these networks is the use of an encoder network that
+takes an input sequence and creates a contextualized representation of it, often called
+the context. This representation is then passed to a decoder which generates a task-
+speciﬁc output sequence. Fig. 8.16 illustrates the architecture.
+…
+Encoder
+Decoder
+Context
+…
+x1
+x2
+xn
+y1
+y2
+ym
+Figure 8.16
+The encoder-decoder architecture. The context is a function of the hidden
+representations of the input, and may be used by the decoder in a variety of ways.
+Encoder-decoder networks consist of three conceptual components:
+1. An encoder that accepts an input sequence, x1:n, and generates a correspond-
+8.7
+•
+THE ENCODER-DECODER MODEL WITH RNNS
+19
+ing sequence of contextualized representations, h1:n. LSTMs, convolutional
+networks, and transformers can all be employed as encoders.
+2. A context vector, c, which is a function of h1:n, and conveys the essence of
+the input to the decoder.
+3. A decoder, which accepts c as input and generates an arbitrary length se-
+quence of hidden states h1:m, from which a corresponding sequence of output
+states y1:m, can be obtained. Just as with encoders, decoders can be realized
+by any kind of sequence architecture.
+In this section we’ll describe an encoder-decoder network based on a pair of
+RNNs, but we’ll see in Chapter 13 how to apply them to transformers as well. We’ll
+build up the equations for encoder-decoder models by starting with the conditional
+RNN language model p(y), the probability of a sequence y.
+Recall that in any language model, we can break down the probability as follows:
+p(y) = p(y1)p(y2|y1)p(y3|y1,y2)... p(ym|y1,...,ym−1)
+(8.28)
+In RNN language modeling, at a particular time t, we pass the preﬁx of t −1
+tokens through the language model, using forward inference to produce a sequence
+of hidden states, ending with the hidden state corresponding to the last word of
+the preﬁx. We then use the ﬁnal hidden state of the preﬁx as our starting point to
+generate the next token.
+More formally, if g is an activation function like tanh or ReLU, a function of
+the input at time t and the hidden state at time t −1, and the softmax is over the
+set of possible vocabulary items, then at time t the output yt and hidden state ht are
+computed as:
+ht = g(ht−1,xt)
+(8.29)
+ˆyt = softmax(ht)
+(8.30)
+We only have to make one slight change to turn this language model with au-
+toregressive generation into an encoder-decoder model that is a translation model
+that can translate from a source text in one language to a target text in a second:
+add a sentence separation marker at the end of the source text, and then simply
+sentence
+separation
+concatenate the target text.
+Let’s use <s> for our sentence separator token, and let’s think about translating
+an English source text (“the green witch arrived”), to a Spanish sentence (“lleg´o
+la bruja verde” (which can be glossed word-by-word as ‘arrived the witch green’).
+We could also illustrate encoder-decoder models with a question-answer pair, or a
+text-summarization pair.
+Let’s use x to refer to the source text (in this case in English) plus the separator
+token <s>, and y to refer to the target text y (in this case in Spanish). Then an
+encoder-decoder model computes the probability p(y|x) as follows:
+p(y|x) = p(y1|x)p(y2|y1,x)p(y3|y1,y2,x)... p(ym|y1,...,ym−1,x)
+(8.31)
+Fig. 8.17 shows the setup for a simpliﬁed version of the encoder-decoder model
+(we’ll see the full model, which requires the new concept of attention, in the next
+section).
+Fig. 8.17 shows an English source text (“the green witch arrived”), a sentence
+separator token (<s>, and a Spanish target text (“lleg´o la bruja verde”). To trans-
+late a source text, we run it through the network performing forward inference to
+20
+CHAPTER 8
+•
+RNNS AND LSTMS
+Source Text
+Target Text
+hn
+embedding
+layer
+hidden
+layer(s)
+softmax
+the
+green
+llegó
+witch
+arrived
+<s>
+llegó
+la
+la
+bruja
+bruja
+verde
+verde
+</s>
+(output of source is ignored)
+Separator
+Figure 8.17
+Translating a single sentence (inference time) in the basic RNN version of encoder-decoder ap-
+proach to machine translation. Source and target sentences are concatenated with a separator token in between,
+and the decoder uses context information from the encoder’s last hidden state.
+generate hidden states until we get to the end of the source. Then we begin autore-
+gressive generation, asking for a word in the context of the hidden layer from the
+end of the source input as well as the end-of-sentence marker. Subsequent words
+are conditioned on the previous hidden state and the embedding for the last word
+generated.
+Let’s formalize and generalize this model a bit in Fig. 8.18. (To help keep things
+straight, we’ll use the superscripts e and d where needed to distinguish the hidden
+states of the encoder and the decoder.) The elements of the network on the left
+process the input sequence x and comprise the encoder. While our simpliﬁed ﬁgure
+shows only a single network layer for the encoder, stacked architectures are the
+norm, where the output states from the top layer of the stack are taken as the ﬁnal
+representation, and the encoder consists of stacked biLSTMs where the hidden states
+from top layers from the forward and backward passes are concatenated to provide
+the contextualized representations for each time step.
+Encoder
+Decoder
+hn 
+hd
+1
+he
+3
+he
+2
+he
+1
+hd
+2
+hd
+3
+hd
+4
+embedding
+layer
+hidden
+layer(s)
+softmax
+x1
+x2
+y1
+hd
+m
+x3
+xn
+<s>
+y1
+y2
+y2
+y3
+y3
+y4
+ym
+</s>
+he
+n = c = hd
+0
+(output is ignored during encoding)
+Figure 8.18
+A more formal version of translating a sentence at inference time in the basic RNN-based
+encoder-decoder architecture. The ﬁnal hidden state of the encoder RNN, hen, serves as the context for the
+decoder in its role as hd
+0 in the decoder RNN, and is also made available to each decoder hidden state.
+8.7
+•
+THE ENCODER-DECODER MODEL WITH RNNS
+21
+The entire purpose of the encoder is to generate a contextualized representation
+of the input. This representation is embodied in the ﬁnal hidden state of the encoder,
+he
+n. This representation, also called c for context, is then passed to the decoder.
+The simplest version of the decoder network would takes this state and use it
+just to initialize the ﬁrst hidden state of the decoder; the ﬁrst decoder RNN cell
+would use c as its prior hidden state hd
+0. The decoder would then autoregressively
+generates a sequence of outputs, an element at a time, until an end-of-sequence
+marker is generated. Each hidden state is conditioned on the previous hidden state
+and the output generated in the previous state.
+As Fig. 8.18 shows, we do something more complex: we make the context vector
+c available to more than just the ﬁrst decoder hidden state, to ensure that the inﬂuence
+of the context vector, c, doesn’t wane as the output sequence is generated. We do
+this by adding c as a parameter to the computation of the current hidden state. using
+the following equation:
+hd
+t = g(ˆyt−1,hd
+t−1,c)
+(8.32)
+Now we’re ready to see the full equations for this version of the decoder in the basic
+encoder-decoder model, with context available at each decoding timestep. Recall
+that g is a stand-in for some ﬂavor of RNN and ˆyt−1 is the embedding for the output
+sampled from the softmax at the previous step:
+c = he
+n
+hd
+0 = c
+hd
+t
+= g(ˆyt−1,hd
+t−1,c)
+ˆyt = softmax(hd
+t )
+(8.33)
+Thus ˆyt is a vector of probabilities over the vocabulary, representing the probability
+of each word occurring at time t. To generate text, we sample from this distribution
+ˆyt. For example, the greedy choice is simply to choose the most most probable word
+to generate at each timestep. We’ll introduce more sophisticated sampling methods
+in Section ??.
+8.7.1
+Training the Encoder-Decoder Model
+Encoder-decoder architectures are trained end-to-end. Each training example is a
+tuple of paired strings, a source and a target. Concatenated with a separator token,
+these source-target pairs can now serve as training data.
+For MT, the training data typically consists of sets of sentences and their transla-
+tions. These can be drawn from standard datasets of aligned sentence pairs, as we’ll
+discuss in Section ??. Once we have a training set, the training itself proceeds as
+with any RNN-based language model. The network is given the source text and then
+starting with the separator token is trained autoregressively to predict the next word,
+as shown in Fig. 8.19.
+Note the differences between training (Fig. 8.19) and inference (Fig. 8.17) with
+respect to the outputs at each time step. The decoder during inference uses its own
+estimated output ˆyt as the input for the next time step xt+1. Thus the decoder will
+tend to deviate more and more from the gold target sentence as it keeps generating
+more tokens. In training, therefore, it is more common to use teacher forcing in the
+teacher forcing
+decoder. Teacher forcing means that we force the system to use the gold target token
+from training as the next input xt+1, rather than allowing it to rely on the (possibly
+erroneous) decoder output ˆyt. This speeds up training.
+22
+CHAPTER 8
+•
+RNNS AND LSTMS
+Encoder
+Decoder
+embedding
+layer
+hidden
+layer(s)
+softmax
+the
+green
+llegó
+witch
+arrived
+<s>
+llegó
+la
+la
+bruja
+bruja
+verde
+verde
+</s>
+gold
+answers
+L1 =
+-log P(y1)
+x1
+x2
+x3
+x4
+L2 =
+-log P(y2)
+L3 =
+-log P(y3)
+L4 =
+-log P(y4)
+L5 =
+-log P(y5)
+per-word
+loss
+y1
+y2
+y3
+y4
+y5
+Total loss is the average 
+cross-entropy loss per 
+target word:
+Figure 8.19
+Training the basic RNN encoder-decoder approach to machine translation. Note that in the
+decoder we usually don’t propagate the model’s softmax outputs ˆyt, but use teacher forcing to force each input
+to the correct gold value for training. We compute the softmax output distribution over ˆy in the decoder in order
+to compute the loss at each token, which can then be averaged to compute a loss for the sentence. This loss is
+then propagated through the decoder parameters and the encoder parameters.
+8.8
+Attention
+The simplicity of the encoder-decoder model is its clean separation of the encoder—
+which builds a representation of the source text—from the decoder, which uses this
+context to generate a target text. In the model as we’ve described it so far, this
+context vector is hn, the hidden state of the last (nth) time step of the source text.
+This ﬁnal hidden state is thus acting as a bottleneck: it must represent absolutely
+everything about the meaning of the source text, since the only thing the decoder
+knows about the source text is what’s in this context vector (Fig. 8.20). Information
+at the beginning of the sentence, especially for long sentences, may not be equally
+well represented in the context vector.
+Encoder
+Decoder
+bottleneck
+bottleneck
+Figure 8.20
+Requiring the context c to be only the encoder’s ﬁnal hidden state forces all the
+information from the entire source sentence to pass through this representational bottleneck.
+The attention mechanism is a solution to the bottleneck problem, a way of
+attention
+mechanism
+allowing the decoder to get information from all the hidden states of the encoder,
+not just the last hidden state.
+In the attention mechanism, as in the vanilla encoder-decoder model, the context
+vector c is a single vector that is a function of the hidden states of the encoder, that
+is, c = f(he
+1 ...he
+n). Because the number of hidden states varies with the size of
+the input, we can’t use the entire set of encoder hidden state vectors directly as the
+8.8
+•
+ATTENTION
+23
+context for the decoder.
+The idea of attention is instead to create the single ﬁxed-length vector c by taking
+a weighted sum of all the encoder hidden states. The weights focus on (‘attend
+to’) a particular part of the source text that is relevant for the token the decoder is
+currently producing. Attention thus replaces the static context vector with one that
+is dynamically derived from the encoder hidden states, different for each token in
+decoding.
+This context vector, ci, is generated anew with each decoding step i and takes
+all of the encoder hidden states into account in its derivation. We then make this
+context available during decoding by conditioning the computation of the current
+decoder hidden state on it (along with the prior hidden state and the previous output
+generated by the decoder), as we see in this equation (and Fig. 8.21):
+hd
+i
+= g(ˆyi−1,hd
+i−1,ci)
+(8.34)
+hd
+1
+hd
+2
+hd
+i
+y1
+y2
+yi
+c1
+c2
+ci
+…
+…
+Figure 8.21
+The attention mechanism allows each hidden state of the decoder to see a
+different, dynamic, context, which is a function of all the encoder hidden states.
+The ﬁrst step in computing ci is to compute how much to focus on each encoder
+state, how relevant each encoder state is to the decoder state captured in hd
+i−1. We
+capture relevance by computing— at each state i during decoding—a score(hd
+i−1,he
+j)
+for each encoder state j.
+The simplest such score, called dot-product attention, implements relevance as
+dot-product
+attention
+similarity: measuring how similar the decoder hidden state is to an encoder hidden
+state, by computing the dot product between them:
+score(hd
+i−1,he
+j) = hd
+i−1 · he
+j
+(8.35)
+The score that results from this dot product is a scalar that reﬂects the degree of
+similarity between the two vectors. The vector of these scores across all the encoder
+hidden states gives us the relevance of each encoder state to the current step of the
+decoder.
+To make use of these scores, we’ll normalize them with a softmax to create a
+vector of weights, αi j, that tells us the proportional relevance of each encoder hidden
+state j to the prior hidden decoder state, hd
+i−1.
+αij = softmax(score(hd
+i−1,he
+j))
+=
+exp(score(hd
+i−1,he
+j)
+P
+k exp(score(hd
+i−1,he
+k))
+(8.36)
+Finally, given the distribution in α, we can compute a ﬁxed-length context vector for
+the current decoder state by taking a weighted average over all the encoder hidden
+states.
+ci =
+X
+j
+αij he
+j
+(8.37)
+24
+CHAPTER 8
+•
+RNNS AND LSTMS
+With this, we ﬁnally have a ﬁxed-length context vector that takes into account
+information from the entire encoder state that is dynamically updated to reﬂect the
+needs of the decoder at each step of decoding. Fig. 8.22 illustrates an encoder-
+decoder network with attention, focusing on the computation of one context vector
+ci.
+Encoder
+Decoder
+hd
+i-1
+he
+3
+he
+2
+he
+1
+hd
+i
+hidden
+layer(s)
+x1
+x2
+yi
+x3
+xn
+yi-1
+yi
+yi+1
+he
+n 
+ci
+.2
+.1
+.3
+.4
+attention
+weights
+ci-1
+ci
+X
+j
+↵ijhe
+j
+↵ij
+hd
+i−1 · he
+j
+…
+…
+Figure 8.22
+A sketch of the encoder-decoder network with attention, focusing on the computation of ci. The
+context value ci is one of the inputs to the computation of hd
+i . It is computed by taking the weighted sum of all
+the encoder hidden states, each weighted by their dot product with the prior decoder hidden state hd
+i−1.
+It’s also possible to create more sophisticated scoring functions for attention
+models. Instead of simple dot product attention, we can get a more powerful function
+that computes the relevance of each encoder hidden state to the decoder hidden state
+by parameterizing the score with its own set of weights, Ws.
+score(hd
+i−1,he
+j) = hd
+t−1Wshe
+j
+The weights Ws, which are then trained during normal end-to-end training, give the
+network the ability to learn which aspects of similarity between the decoder and
+encoder states are important to the current application. This bilinear model also
+allows the encoder and decoder to use different dimensional vectors, whereas the
+simple dot-product attention requires that the encoder and decoder hidden states
+have the same dimensionality.
+We’ll return to the concept of attention when we deﬁne the transformer archi-
+tecture in Chapter 9, which is based on a slight modiﬁcation of attention called
+self-attention.
+8.9
+Summary
+This chapter has introduced the concepts of recurrent neural networks and how they
+can be applied to language problems. Here’s a summary of the main points that we
+covered:
+• In simple Recurrent Neural Networks sequences are processed one element at
+a time, with the output of each neural unit at time t based both on the current
+input at t and the hidden layer from time t −1.
+BIBLIOGRAPHICAL AND HISTORICAL NOTES
+25
+• RNNs can be trained with a straightforward extension of the backpropagation
+algorithm, known as backpropagation through time (BPTT).
+• Simple recurrent networks fail on long inputs because of problems like van-
+ishing gradients; instead modern systems use more complex gated architec-
+tures such as LSTMs that explicitly decide what to remember and forget in
+their hidden and context layers.
+• Common language-based applications for RNNs include:
+– Probabilistic language modeling: assigning a probability to a sequence,
+or to the next element of a sequence given the preceding words.
+– Auto-regressive generation using a trained language model.
+– Sequence labeling like part-of-speech tagging, where each element of a
+sequence is assigned a label.
+– Sequence classiﬁcation, where an entire text is assigned to a category, as
+in spam detection, sentiment analysis or topic classiﬁcation.
+– Encoder-decoder architectures, where an input is mapped to an output
+of different length and alignment.
+Bibliographical and Historical Notes
+Inﬂuential investigations of RNNs were conducted in the context of the Parallel Dis-
+tributed Processing (PDP) group at UC San Diego in the 1980’s. Much of this work
+was directed at human cognitive modeling rather than practical NLP applications
+(Rumelhart and McClelland 1986, McClelland and Rumelhart 1986). Models using
+recurrence at the hidden layer in a feedforward network (Elman networks) were in-
+troduced by Elman (1990). Similar architectures were investigated by Jordan (1986)
+with a recurrence from the output layer, and Mathis and Mozer (1995) with the
+addition of a recurrent context layer prior to the hidden layer. The possibility of
+unrolling a recurrent network into an equivalent feedforward network is discussed
+in (Rumelhart and McClelland, 1986).
+In parallel with work in cognitive modeling, RNNs were investigated extensively
+in the continuous domain in the signal processing and speech communities (Giles
+et al. 1994, Robinson et al. 1996). Schuster and Paliwal (1997) introduced bidirec-
+tional RNNs and described results on the TIMIT phoneme transcription task.
+While theoretically interesting, the difﬁculty with training RNNs and manag-
+ing context over long sequences impeded progress on practical applications. This
+situation changed with the introduction of LSTMs in Hochreiter and Schmidhuber
+(1997) and Gers et al. (2000). Impressive performance gains were demonstrated
+on tasks at the boundary of signal processing and language processing including
+phoneme recognition (Graves and Schmidhuber, 2005), handwriting recognition
+(Graves et al., 2007) and most signiﬁcantly speech recognition (Graves et al., 2013).
+Interest in applying neural networks to practical NLP problems surged with the
+work of Collobert and Weston (2008) and Collobert et al. (2011). These efforts made
+use of learned word embeddings, convolutional networks, and end-to-end training.
+They demonstrated near state-of-the-art performance on a number of standard shared
+tasks including part-of-speech tagging, chunking, named entity recognition and se-
+mantic role labeling without the use of hand-engineered features.
+Approaches that married LSTMs with pretrained collections of word-embeddings
+based on word2vec (Mikolov et al., 2013) and GloVe (Pennington et al., 2014)
+26
+CHAPTER 8
+•
+RNNS AND LSTMS
+quickly came to dominate many common tasks: part-of-speech tagging (Ling et al.,
+2015), syntactic chunking (Søgaard and Goldberg, 2016), named entity recognition
+(Chiu and Nichols, 2016; Ma and Hovy, 2016), opinion mining (Irsoy and Cardie,
+2014), semantic role labeling (Zhou and Xu, 2015) and AMR parsing (Foland and
+Martin, 2016). As with the earlier surge of progress involving statistical machine
+learning, these advances were made possible by the availability of training data pro-
+vided by CONLL, SemEval, and other shared tasks, as well as shared resources such
+as Ontonotes (Pradhan et al., 2007), and PropBank (Palmer et al., 2005).
+The modern neural encoder-decoder approach was pioneered by Kalchbrenner
+and Blunsom (2013), who used a CNN encoder and an RNN decoder. Cho et al.
+(2014) (who coined the name “encoder-decoder”) and Sutskever et al. (2014) then
+showed how to use extended RNNs for both encoder and decoder. The idea that a
+generative decoder should take as input a soft weighting of the inputs, the central
+idea of attention, was ﬁrst developed by Graves (2013) in the context of handwriting
+recognition. Bahdanau et al. (2015) extended the idea, named it “attention” and
+applied it to MT.
+Bibliographical and Historical Notes
+27
+Bahdanau, D., K. H. Cho, and Y. Bengio. 2015. Neural ma-
+chine translation by jointly learning to align and translate.
+ICLR 2015.
+Chiu, J. P. C. and E. Nichols. 2016. Named entity recognition
+with bidirectional LSTM-CNNs. TACL, 4:357–370.
+Cho, K., B. van Merri¨enboer, C. Gulcehre, D. Bahdanau,
+F. Bougares, H. Schwenk, and Y. Bengio. 2014. Learn-
+ing phrase representations using RNN encoder–decoder
+for statistical machine translation. EMNLP.
+Collobert, R. and J. Weston. 2008. A uniﬁed architecture for
+natural language processing: Deep neural networks with
+multitask learning. ICML.
+Collobert,
+R.,
+J.
+Weston,
+L.
+Bottou,
+M.
+Karlen,
+K. Kavukcuoglu, and P. Kuksa. 2011. Natural language
+processing (almost) from scratch. JMLR, 12:2493–2537.
+Elman, J. L. 1990. Finding structure in time. Cognitive sci-
+ence, 14(2):179–211.
+Foland, W. and J. H. Martin. 2016. CU-NLP at SemEval-
+2016 task 8: AMR parsing using LSTM-based recurrent
+neural networks. SemEval-2016.
+Gers, F. A., J. Schmidhuber, and F. Cummins. 2000. Learn-
+ing to forget: Continual prediction with lstm.
+Neural
+computation, 12(10):2451–2471.
+Giles, C. L., G. M. Kuhn, and R. J. Williams. 1994. Dynamic
+recurrent neural networks:
+Theory and applications.
+IEEE Trans. Neural Netw. Learning Syst., 5(2):153–156.
+Graves, A. 2013. Generating sequences with recurrent neural
+networks. ArXiv.
+Graves, A., S. Fern´andez, M. Liwicki, H. Bunke, and
+J. Schmidhuber. 2007. Unconstrained on-line handwrit-
+ing recognition with recurrent neural networks. NeurIPS.
+Graves,
+A.,
+A.-r. Mohamed,
+and G. Hinton. 2013.
+Speech recognition with deep recurrent neural networks.
+ICASSP.
+Graves, A. and J. Schmidhuber. 2005. Framewise phoneme
+classiﬁcation with bidirectional LSTM and other neural
+network architectures.
+Neural Networks, 18(5-6):602–
+610.
+Hochreiter, S. and J. Schmidhuber. 1997. Long short-term
+memory. Neural Computation, 9(8):1735–1780.
+Irsoy, O. and C. Cardie. 2014. Opinion mining with deep
+recurrent neural networks. EMNLP.
+Jordan, M. 1986. Serial order: A parallel distributed process-
+ing approach. Technical Report ICS Report 8604, Univer-
+sity of California, San Diego.
+Kalchbrenner, N. and P. Blunsom. 2013. Recurrent continu-
+ous translation models. EMNLP.
+Ling, W., C. Dyer, A. W. Black, I. Trancoso, R. Fermandez,
+S. Amir, L. Marujo, and T. Lu´ıs. 2015. Finding function
+in form: Compositional character models for open vocab-
+ulary word representation. EMNLP.
+Ma, X. and E. H. Hovy. 2016. End-to-end sequence labeling
+via bi-directional LSTM-CNNs-CRF. ACL.
+Mathis, D. A. and M. C. Mozer. 1995. On the computational
+utility of consciousness. NeurIPS. MIT Press.
+McClelland, J. L. and D. E. Rumelhart, eds. 1986. Parallel
+Distributed Processing: Explorations in the Microstruc-
+ture of Cognition, volume 2: Psychological and Biologi-
+cal Models. MIT Press.
+Mikolov, T., K. Chen, G. S. Corrado, and J. Dean. 2013. Ef-
+ﬁcient estimation of word representations in vector space.
+ICLR 2013.
+Mikolov, T., M. Karaﬁ´at, L. Burget, J. ˇCernock`y, and
+S. Khudanpur. 2010. Recurrent neural network based lan-
+guage model. INTERSPEECH.
+Miller, G. A. and J. A. Selfridge. 1950. Verbal context and
+the recall of meaningful material. American Journal of
+Psychology, 63:176–185.
+Palmer, M., P. Kingsbury, and D. Gildea. 2005. The proposi-
+tion bank: An annotated corpus of semantic roles. Com-
+putational Linguistics, 31(1):71–106.
+Pennington, J., R. Socher, and C. D. Manning. 2014. GloVe:
+Global vectors for word representation. EMNLP.
+Pradhan, S., E. H. Hovy, M. P. Marcus, M. Palmer, L. A.
+Ramshaw, and R. M. Weischedel. 2007. Ontonotes: a
+uniﬁed relational semantic representation. Int. J. Seman-
+tic Computing, 1(4):405–419.
+Robinson, T., M. Hochberg, and S. Renals. 1996. The use
+of recurrent neural networks in continuous speech recog-
+nition. In C.-H. Lee, F. K. Soong, and K. K. Paliwal,
+eds, Automatic speech and speaker recognition, 233–258.
+Springer.
+Rumelhart, D. E., G. E. Hinton, and R. J. Williams. 1986.
+Learning internal representations by error propagation. In
+D. E. Rumelhart and J. L. McClelland, eds, Parallel Dis-
+tributed Processing, volume 2, 318–362. MIT Press.
+Rumelhart, D. E. and J. L. McClelland, eds. 1986. Parallel
+Distributed Processing: Explorations in the Microstruc-
+ture of Cognition, volume 1: Foundations. MIT Press.
+Schuster, M. and K. K. Paliwal. 1997. Bidirectional recurrent
+neural networks. IEEE Transactions on Signal Process-
+ing, 45:2673–2681.
+Shannon, C. E. 1951. Prediction and entropy of printed En-
+glish. Bell System Technical Journal, 30:50–64.
+Søgaard, A. and Y. Goldberg. 2016. Deep multi-task learning
+with low level tasks supervised at lower layers. ACL.
+Sutskever, I., O. Vinyals, and Q. V. Le. 2014. Sequence to
+sequence learning with neural networks. NeurIPS.
+Werbos, P. 1974. Beyond regression: new tools for predic-
+tion and analysis in the behavioral sciences. Ph.D. thesis,
+Harvard University.
+Werbos, P. J. 1990. Backpropagation through time: what
+it does and how to do it.
+Proceedings of the IEEE,
+78(10):1550–1560.
+Zhou, J. and W. Xu. 2015. End-to-end learning of semantic
+role labeling using recurrent neural networks. ACL.
