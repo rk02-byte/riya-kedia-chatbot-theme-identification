@@ -1,2 +1,9 @@
 fastapi
 uvicorn
+python-multipart
+python-docx
+pytesseract
+Pillow
+PyMuPDF
+chromadb
+sentence-transformers
