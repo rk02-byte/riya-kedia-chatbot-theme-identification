@@ -10,6 +10,7 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 client = chromadb.Client()
 collection = client.get_or_create_collection("documents")
 
+#chunk_index
 def chunk_text(text: str, chunk_size: int = 500) -> list:
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
