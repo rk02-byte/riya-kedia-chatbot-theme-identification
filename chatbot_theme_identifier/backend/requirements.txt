@@ -7,3 +7,5 @@ Pillow
 PyMuPDF
 chromadb
 sentence-transformers
+groq
+python-dotenv
