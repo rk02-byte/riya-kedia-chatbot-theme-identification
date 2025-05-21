@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "http://localhost:8000/api"
+API_URL = "https://riya-kedia-wasserstoff-aiinterntask.onrender.com"
 
 st.set_page_config(page_title="Document Theme Chatbot", layout="centered")
 
