@@ -1,10 +1,19 @@
 from fastapi import FastAPI
 from app.api import upload, query, theme
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Wasserstoff AI Intern Task",
     description="Document Research & Theme Identification Chatbot",
     version="1.0.0"
+)
+#CORS error
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://riya-document-research-theme-7iie.onrender.com"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
