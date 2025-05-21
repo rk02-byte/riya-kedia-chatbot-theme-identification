@@ -12,31 +12,32 @@ st.markdown("Upload PDFs or images and ask questions. Get cited answers and cros
 #Upload File
 st.subheader("Step 1: Upload Document (PDF or Image)")
 
-uploaded_file = st.file_uploader("Choose a file", type=["pdf", "jpg", "jpeg", "png"])
+uploaded_files = st.file_uploader("Choose one or more files", type=["pdf", "jpg", "jpeg", "png"], accept_multiple_files=True)
 
-if uploaded_file:
-    # File size check: Streamlit Cloud is sensitive to large uploads
-    if uploaded_file.size > 2 * 1024 * 1024:
-        st.error("File too large. Please upload a file under 2MB.")
-        st.stop()
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        if uploaded_file.size > 2 * 1024 * 1024:
+            st.warning(f"{uploaded_file.name} is too large (>2MB). Skipping.")
+            continue
 
-    files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
-    with st.spinner("Uploading and processing file..."):
-        try:
-            res = requests.post(f"{API_URL}/upload/", files=files, timeout=40)
-            if res.status_code == 200:
-                st.success(f"Uploaded: {uploaded_file.name}")
-                upload_data = res.json()
-                st.write("Text preview:")
-                st.write(upload_data["text_preview"])
-                st.write(f"Chunks stored: {upload_data['chunks_stored']}")
-            else:
-                st.error("Upload failed.")
-                st.write("Status:", res.status_code)
-                st.write("Response:", res.text)
-        except requests.exceptions.RequestException as e:
-            st.error("Upload failed due to network or timeout.")
-            st.exception(e)
+        files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+        with st.spinner(f"Uploading and processing {uploaded_file.name}..."):
+            try:
+                res = requests.post(f"{API_URL}/upload/", files=files, timeout=40)
+                if res.status_code == 200:
+                    st.success(f"Uploaded: {uploaded_file.name}")
+                    upload_data = res.json()
+                    st.write("Text preview:")
+                    st.write(upload_data["text_preview"])
+                    st.write(f"hunks stored: {upload_data['chunks_stored']}")
+                else:
+                    st.error(f"Upload failed for {uploaded_file.name}")
+                    st.write("Status:", res.status_code)
+                    st.write("Response:", res.text)
+            except requests.exceptions.RequestException as e:
+                st.error(f"Upload failed for {uploaded_file.name}")
+                st.exception(e)
+
 
 # Step 2: Ask a question
 st.subheader("Step 2: Ask a Research Question")
@@ -64,7 +65,7 @@ if query:
             st.exception(e)
 
     # Step 3: Generate themes (optional)
-    if st.button("🧠 Generate Themes"):
+    if st.button("Generate Themes"):
         if not chunks:
             st.warning("No chunks available to analyze.")
         else:
