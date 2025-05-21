@@ -21,6 +21,8 @@ if uploaded_file is not None:
         st.json(res.json())
     else:
         st.error("Upload failed.")
+        st.write("Error code:", res.status_code)
+        st.write("Response:", res.text)
 
 # Question
 st.subheader("Step 2: Ask a Research Question")
