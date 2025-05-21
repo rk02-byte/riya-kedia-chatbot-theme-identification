@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import upload, query  # <- ADD this
+from app.api import upload, query, theme
 
 app = FastAPI(
     title="Wasserstoff AI Intern Task",
@@ -9,6 +9,7 @@ app = FastAPI(
 
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
 app.include_router(query.router, prefix="/api", tags=["Search"])
+app.include_router(theme.router, prefix="/api", tags=["Theme"])
 
 @app.get("/")
 def read_root():

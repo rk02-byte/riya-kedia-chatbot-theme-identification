@@ -9,3 +9,6 @@ chromadb
 sentence-transformers
 groq
 python-dotenv
+
+streamlit
+requests
