@@ -22,10 +22,10 @@ It involves building a web-based chatbot that performs research over a large set
 
 - **Backend**: Python, FastAPI
 - **OCR**: Tesseract
-- **LLMs**: OpenAI / Groq (LLAMA3)
-- **Vector DB**: ChromaDB / FAISS
-- **Frontend**: Streamlit / HTML-JS (TBD)
-- **Deployment**: Vercel / Render / Hugging Face Spaces
+- **LLMs**: Groq (LLAMA3)
+- **Vector DB**: ChromaDB 
+- **Frontend**: Streamlit 
+- **Deployment**: Render / Hugging Face Spaces
 
 ---
 
@@ -70,16 +70,5 @@ chatbot_theme_identifier/
 
 4. Open in browser: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
----
 
-## 🧪 To-Do Next
-
-- [ ] Document upload and OCR processing
-- [ ] Text chunking and vector database storage
-- [ ] Semantic query and citation engine
-- [ ] Theme extraction logic
-- [ ] Frontend integration
-- [ ] Deployment & video explanation
-
----
 
