@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "https://riya-document-research-theme-7iie.onrender.com"
+API_URL = "https://riya-document-research-theme-7iie.onrender.com/api"
 
 st.set_page_config(page_title="Document Theme Chatbot", layout="centered")
 
@@ -25,7 +25,7 @@ if uploaded_file is not None:
         st.write("Response:", res.text)
 
 # Question
-st.subheader("Step 2: Ask a Research Question")
+st.subheader("Step 2: Ask a Question")
 query = st.text_input("Enter your query (e.g., What penalties were mentioned?)")
 if query:
     with st.spinner("Searching documents..."):
