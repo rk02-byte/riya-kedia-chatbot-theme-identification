@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "https://riya-kedia-wasserstoff-aiinterntask.onrender.com"
+API_URL = "https://riya-document-research-theme-7iie.onrender.com"
 
 st.set_page_config(page_title="Document Theme Chatbot", layout="centered")
 
