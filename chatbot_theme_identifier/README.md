@@ -69,10 +69,9 @@ This repository contains my submission for the AI Internship Task at Wasserstoff
    - Top chunks are passed to Groq’s LLAMA3 model  
    - Model groups results into themes  
    - Each theme includes a summary and excerpts for citation
-
----
-
+   - 
 ##  Project Structure
+---
 chatbot_theme_identifier/
 │
 ├── backend/ # Backend (FastAPI)
@@ -99,11 +98,11 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 
 
-# Frontend setup
+### Frontend setup
 cd chatbot_theme_identifier/frontend
 streamlit run app.py
 
-# API Endpoints
+## API Endpoints
 POST	/api/upload/	
 GET	/api/search/	
 POST	/api/theme/
