@@ -1,36 +1,57 @@
-# Document Research & Theme Identification Chatbot
+# Document Research and Theme Identification Chatbot
 
-This is the internship assessment project for the AI Intern role at **Wasserstoff**.  
-The project allows users to upload multiple documents (PDFs or images), ask natural language questions across them, and receive theme-based insights with cited document excerpts.
+This repository contains my submission for the AI Internship Task at Wasserstoff Innovation and Learning Labs. The project implements a system that allows users to upload multiple legal/compliance documents, ask semantic questions across them, and receive summarized themes with citations. The full-stack application is deployed and publicly accessible.
 
 ---
-## 🔗 Live Demo
 
-- **Frontend (Streamlit App)**: [Open App](https://riya-kedia-document-research-theme-identification-chatbot.streamlit.app/)
+## Live Deployment
 
+- **Frontend (Streamlit Application)**: [View Live App](https://riya-kedia-document-research-theme-identification-chatbot.streamlit.app/)
 ---
 
 ## Features
 
--  Upload multiple PDF or image documents
--  Extracts text using **OCR (Tesseract)** or PDF parsing
--  Stores chunked document embeddings using **ChromaDB**
--  Query documents semantically using **Sentence Transformers**
--  Synthesizes themes from top chunks using **LLAMA3 (via Groq)**
--  Citations provided using document IDs and excerpts
+- Upload multiple PDF or image documents
+- Extract text using OCR (Tesseract) or PDF parsing
+- Chunk and embed documents using sentence-transformers
+- Store and query embeddings using ChromaDB
+- Ask natural language questions to retrieve relevant document chunks
+- Generate theme-based summaries from retrieved chunks using the LLAMA3 model (via Groq API)
+- Include document-level citation mapping for transparency
 
 ---
 
-##  Tech Stack
+## Technology Stack
 
-- **Backend**: FastAPI, Uvicorn
-- **OCR**: Tesseract, PyMuPDF
-- **LLM**: Groq (LLAMA3)
-- **Embeddings**: SentenceTransformers (all-MiniLM-L6-v2)
-- **Vector DB**: ChromaDB 
-- **Frontend**: Streamlit 
-- **Deployment**:  Backend: Render · Frontend: Streamlit Cloud
+**Backend:**
+- Python 3.10
+- FastAPI
+- Tesseract OCR (via pytesseract)
+- PyMuPDF (for PDF parsing)
+- SentenceTransformers (MiniLM model)
+- ChromaDB (for vector storage)
+- Groq API (LLAMA3 for theme generation)
+- Uvicorn (server)
 
+**Frontend:**
+- Streamlit
+
+**Hosting:**
+- Render (Backend)
+- Streamlit Cloud (Frontend)
+
+---
+
+## System Workflow
+
+1. **Document Upload**  
+   Users can upload one or more PDF/image files. Text is extracted using either OCR or direct PDF parsing, then chunked and embedded.
+
+2. **Semantic Search**  
+   Users submit a query. The system compares the query's embedding with stored chunks to retrieve the most relevant sections.
+
+3. **Theme Synthesis**  
+   Retrieved chunks are passed to a language model (LLAMA3 via Groq) to produce theme-based summaries with cited excerpts.
 ---
 ##  How It Works
 
@@ -54,35 +75,36 @@ The project allows users to upload multiple documents (PDFs or images), ask natu
 ##  Project Structure
 chatbot_theme_identifier/
 │
-├── backend/ ← FastAPI backend (API, OCR, embeddings)
+├── backend/ # Backend (FastAPI)
 │ ├── app/
-│ │ ├── api/ ← Upload, search, theme routes
-│ │ ├── services/ ← Embedding and storage logic
-│ │ └── main.py ← FastAPI entry point
-│ ├── data/ ← Uploaded docs and chunk storage
+│ │ ├── api/ # API routes: upload, search, theme
+│ │ ├── services/ # Embedding and storage logic
+│ │ └── main.py # FastAPI app entry point
+│ ├── data/ # Uploaded documents and chunked text
 │ ├── requirements.txt
-│ └── start.sh
+│ └── start.sh # Startup script for Render
 │
-├── frontend/ ← Streamlit app
-│ └── app.py
+├── frontend/ # Frontend (Streamlit)
+│ └── app.py # Streamlit interface
 ---
+## Setup Instructions (Local Development)
 
-##   Local Setup Instructions
+### Backend (FastAPI)
 
 ```bash
-# Clone the repo
-cd chatbot_theme_identifier
-
-# Backend setup
-cd backend
+cd chatbot_theme_identifier/backend
 python -m venv venv
-venv\Scripts\activate  # (Windows)
+venv\Scripts\activate            # On Windows
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 
+
 # Frontend setup
-cd ../frontend
+cd chatbot_theme_identifier/frontend
 streamlit run app.py
 
-
+# API Endpoints
+POST	/api/upload/	
+GET	/api/search/	
+POST	/api/theme/
 
