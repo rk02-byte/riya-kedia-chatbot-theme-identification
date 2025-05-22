@@ -1,6 +1,6 @@
 # Document Research and Theme Identification Chatbot
 
-This repository contains my submission for the AI Internship Task at Wasserstoff Innovation and Learning Labs. The project implements a system that allows users to upload multiple legal/compliance documents, ask semantic questions across them, and receive summarized themes with citations. The full-stack application is deployed and publicly accessible.
+This repository contains my submission for the AI Internship Task at Wasserstoff Innovation and Learning Labs. The project implements a system that allows users to upload multiple documents, ask semantic questions across them, and receive summarized themes with citations. The full-stack application is deployed and publicly accessible.
 
 ---
 
@@ -71,7 +71,8 @@ This repository contains my submission for the AI Internship Task at Wasserstoff
    - Each theme includes a summary and excerpts for citation
    - 
 ##  Project Structure
----
+
+```
 chatbot_theme_identifier/
 │
 ├── backend/ # Backend (FastAPI)
@@ -85,7 +86,7 @@ chatbot_theme_identifier/
 │
 ├── frontend/ # Frontend (Streamlit)
 │ └── app.py # Streamlit interface
----
+```
 ## Setup Instructions (Local Development)
 
 ### Backend (FastAPI)
@@ -97,13 +98,19 @@ venv\Scripts\activate            # On Windows
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 
-
+```
 ### Frontend setup
+```bash
 cd chatbot_theme_identifier/frontend
 streamlit run app.py
 
+```
+
 ## API Endpoints
+```bash
 POST	/api/upload/	
 GET	/api/search/	
 POST	/api/theme/
+
+```
 
