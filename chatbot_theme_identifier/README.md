@@ -1,6 +1,6 @@
 # Document Research and Theme Identification Chatbot
 
-This repository contains my submission for the AI Internship Task at Wasserstoff Innovation and Learning Labs. The project implements a system that allows users to upload multiple documents, ask semantic questions across them, and receive summarized themes with citations. The full-stack application is deployed and publicly accessible.
+The project implements a system that allows users to upload multiple documents, ask semantic questions across them, and receive summarized themes with citations. The full-stack application is deployed and publicly accessible.
 
 ---
 
